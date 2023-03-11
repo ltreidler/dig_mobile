@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "nodemon backend/index",
     "seed": "node backend/script/seed",
-    "sync": "node backend/script/seed CLEAR=true"
+    "sync": "node backend/script/seed CLEAR=true",
+    "start:dev": "nodemon backend/index && npx expo start"
   },
   "repository": {
     "type": "git",

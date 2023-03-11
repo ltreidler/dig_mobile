@@ -1,5 +1,5 @@
 //convert neo4j properties to native js types
-export function toNative(properties) {
+function toNative(properties) {
   return Object.fromEntries(
     Object.keys(properties).map(key => {
       let value = valueToNative(properties[key]);
@@ -12,7 +12,7 @@ export function toNative(properties) {
 function valueToNative(value) {
   if (Array.isArray(value)) {
     value = value.map(val => valueToNative(value));
-  } else if (isInt(value)) {
+  } else if ((value)) {
     value = value.toNumber();
   } else if (
     isDate(value) ||
@@ -33,3 +33,20 @@ function valueToNative(value) {
 
   return value;
 }
+
+function parseNeo(records) {
+  console.log(Array.isArray(records));
+  if(Array.isArray(records)) {
+    records = records.map(({keys, _fields, _fieldLookup}) => {
+      let parsed = {};
+      for(let key of keys) {
+        parsed[key] = _fields[_fieldLookup[key]];
+      }
+      return parsed;
+    })
+    return records;
+
+  }
+}
+
+module.exports = parseNeo;

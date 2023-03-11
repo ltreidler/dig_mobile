@@ -1,20 +1,7 @@
 require('dotenv').config();
 const app = require('./app');
 const PORT = process.env.PORT || 3000;
-
-const neo4j = require('neo4j-driver');
-
-const config = {logging: {
-    level: 'info',
-    logger: (level, message) => console.log(level + ' ' + message)
-}}
-
-const driver = neo4j.driver(
-    process.env.DB_URI, 
-    neo4j.auth.basic('neo4j', process.env.DB_PASSWORD), 
-    config);
-
-
+const driver = require('./db/db');
 
 const init = async () => {
     try{
@@ -30,4 +17,4 @@ const init = async () => {
 
 init();
 
-module.exports = driver;
+

@@ -12,6 +12,9 @@ app.use(morgan('dev'))
 // body parsing middleware
 app.use(express.json())
 
+//routes
+app.use('/api', require('./api'));
+
 // error handling endware
 app.use((err, req, res, next) => {
   console.error(err)
