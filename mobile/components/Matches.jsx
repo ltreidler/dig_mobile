@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FlatList, SafeAreaView, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator } from "react-native";
+import { FlatList, SafeAreaView, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator, Image } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchMatches, selectMatches } from "../features/matchesSlice";
 import { selectAuth } from "../features/authSlice";
@@ -11,20 +11,22 @@ const MatchesPage = () => {
   const [matches, setMatches] = useState([]);
   const [lastPage, setLastPage] = useState(false);
 
+  const {user} = useSelector(selectAuth);
   const dispatch = useDispatch();
   const { matches: newMatches} = useSelector(selectMatches);
-  const {user} = useSelector(selectAuth);
+  
 
   //initially, get the state
   useEffect(() => {
-    dispatch(fetchMatches(1));
-  }, [dispatch])
+    if(!user.id) return;
+    else dispatch(fetchMatches({page, id: user.id}));
+  }, [dispatch, user])
 
   //when new match data is fetched
   useEffect(() => {
     if(newMatches && newMatches.length) {
         setLoading(false);
-        setMatches([...matches, ...dogs]);
+        setMatches([...matches, ...newMatches]);
         if(newMatches.length < 10) setLastPage(true);
     }
   }, [newMatches])
@@ -33,7 +35,7 @@ const MatchesPage = () => {
     if(lastPage) return;
     else if (!loading) {
       setLoading(true);
-      dispatch(fetchMatches(page + 1));
+      dispatch(fetchMatches({page: page + 1, id: user.id}));
       setPage(page + 1);
     }
   };
@@ -53,7 +55,7 @@ const MatchesPage = () => {
     console.log('Dislike!');
   }
 
-  const renderMatch = ({ image, name, breed, age, onLike, onDislike }) => {
+  const renderMatch = ({ image, name, breed, age, energy, size, sex}) => {
     return (
       <View style={styles.card}>
         <Image source={{ uri: image }} style={styles.image} />
@@ -75,17 +77,14 @@ const MatchesPage = () => {
   };
 
   return (
-    <SafeAreaView>
-    <Text>{user && user.name && `Welcome, ${user.name}`}</Text>
       <FlatList
         data={matches}
-        keyExtractor={(match) => `${match.id}`}
-        renderItem={renderMatch}
+        keyExtractor={(match,i) => `${match.id}-${i}`}
+        renderItem={({item}) => renderMatch(item)}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
       />
-    </SafeAreaView>
   );
 };
 
@@ -136,6 +135,5 @@ const styles = StyleSheet.create({
       fontWeight: 'bold',
     },
   });
-  
 
 export default MatchesPage;

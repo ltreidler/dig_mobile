@@ -4,16 +4,11 @@ import apiClient from "../api";
 /*
   THUNKS
 */
-export const fetchMatches = createAsyncThunk('matches/fetch', async (page, {getState}) => {
+export const fetchMatches = createAsyncThunk('matches/fetch', async ({page,id}) => {
   try {
-    const {id} = getState(state => state.user);
-    if(!id) throw new Error('No user information');
+    if(!id) throw new Error('User id required');
 
-    const {data} = apiClient.get(`/matches?page=${page}`, {
-        headers: {
-          authorization: id,
-        }
-      })
+    const {data} = await apiClient.get(`/matches?page=${page}&id=${id}`)
 
     return {matches: data, error: null};
   } catch (err) {

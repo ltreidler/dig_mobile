@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const driver = require("../db/db");
-const parseNeo = require('../db/utils');
+const neo4j = require('neo4j-driver');
 
 // /api/matches
 // sends back paginated matches, 10 at a time
@@ -9,8 +9,8 @@ router.get('/', async (req, res, next) => {
     try {
         let {page} = req.query || 1;
         if(isNaN(Number(page)) || page < 1) page = 1;
-        const offset = (page - 1) * 10;
-        const {id} = req.headers.authorization;
+        const offset = neo4j.int((page - 1) * 10);
+        const id = neo4j.int(req.query.id);
 
         const session = driver.session();
 
@@ -25,12 +25,12 @@ router.get('/', async (req, res, next) => {
         MATCH (match)-[:IS_A|IS_SIZE|IS_SEX|HAS_ENERGY|IS_AGE]->(b)
         RETURN similarity, id, match.name AS name, match.image AS image, frequency, collect(b) AS details
         ORDER BY similarity DESC
-        SKIP ${offset}
+        SKIP $offset
         LIMIT 10
         `;
 
         const data = await session.executeWrite((tx) => 
-            tx.run(query, {id}));
+            tx.run(query, {id, offset}));
 
         
         const matches = data.records.map(record => {
@@ -49,9 +49,11 @@ router.get('/', async (req, res, next) => {
             }
         })
 
-        res.send(matches);
-
         await session.close();
+
+        res.json(matches);
+
+        
 
         
     
@@ -62,8 +64,29 @@ router.get('/', async (req, res, next) => {
 
 // /api/matches/like/:dogId
 // creates like relationship, sends back whether the other user has also liked
-router.post('/like/:dogId', async (req, res, next) => {
+router.post('/like', async (req, res, next) => {
     try {
+        const {dogId, matchId} = req.body;
+
+        const session = driver.session();
+
+        const query = `
+        MATCH (d:Dog), (m:Dog)
+        WHERE id(d) = $dogId AND id(m) = $matchId
+        MERGE (d)-[r1:LIKED]->(m)
+        SET r1.weight = 0.5
+        WITH d, m
+        MATCH (m)-[r:LIKED]->(d)
+        RETURN r AS relationship`;
+
+        const data = await session.executeWrite((tx) => 
+            tx.run(query, {dogId: neo4j.int(dogId), matchId: neo4j.int(matchId)}));
+
+        await session.close();
+
+        let relationshipStatus = data.records.length ? data.records[0].get('relationship').type === 'LIKED' : false;
+
+        res.json({match: relationshipStatus});
 
     } catch (err) {
         next(err);
