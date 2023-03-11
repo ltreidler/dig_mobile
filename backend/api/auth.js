@@ -1,30 +1,36 @@
 const router = require("express").Router();
 const driver = require("../db/db");
 
-router.get('/login', async (req, res, next) => {
+router.put('/login', async (req, res, next) => {
     try {
         const {username, password} = req.body;
+        console.log(req.body);
 
         const session = driver.session();
 
         const query = `
         MATCH (dog:Dog {username: $username, password: $password})
         WITH dog
-        MATCH (dog)-[:IS_A|IS_SIZE]->(traits)
-        RETURN dog, id(dog) AS id, collect(b) AS details`;
+        MATCH (dog)-[:IS_A|IS_SIZE|IS_SEX|HAS_ENERGY|IS_AGE]->(b)
+        RETURN dog.username AS username, id(dog) AS id, collect(b) AS details`;
 
-        const data = await session.executeWrite((tx) => 
-            tx.run(query, {username, password})).records[0];
+        let data = await session.executeWrite((tx) => 
+            tx.run(query, {username, password}));
 
-        const details = data.get('details');
+        if(!data || !data.records.length) throw new Error('Dog not found');
+
+        data = data.records[0];
+
+        const details = data.get('details').reduce((all, node) => {
+            let label = node.labels[0].toLowerCase();
+            all[label] = node.properties[Object.keys(node.properties)[0]];
+            return all;
+        }, {});
 
         const dog = {
             id: data.get('id').toNumber(),
-            energy: details[0].properties.level,
-            breed: details[1].properties.name,
-            age: details[2].properties.category,
-            size: details[3].properties.category,
-            sex: details[4].properties.type
+            username: data.get('username'),
+            ...details
         }
 
         res.send(dog);

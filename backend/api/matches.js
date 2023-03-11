@@ -10,14 +10,13 @@ router.get('/', async (req, res, next) => {
         let {page} = req.query || 1;
         if(isNaN(Number(page)) || page < 1) page = 1;
         const offset = (page - 1) * 10;
-
-        const dogId = 1244;
+        const {id} = req.headers.authorization;
 
         const session = driver.session();
 
         const query = `
         MATCH (d1:Dog)-[r1*]->(n)<-[r2*]-(d2:Dog)
-        WHERE id(d1) = $dogId
+        WHERE id(d1) = $id
         AND d1 <> d2
         AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
         UNWIND r1 as rel1
@@ -31,10 +30,8 @@ router.get('/', async (req, res, next) => {
         `;
 
         const data = await session.executeWrite((tx) => 
-            tx.run(query, {dogId}));
+            tx.run(query, {id}));
 
-        //console.log(data.records[0].get('details')[0].properties.name);
-        console.log(data.records[0].get('details'));
         
         const matches = data.records.map(record => {
             const details = record.get('details').reduce((all, node) => {
