@@ -39,8 +39,10 @@ function parseNeo(records) {
   if(Array.isArray(records)) {
     records = records.map(({keys, _fields, _fieldLookup}) => {
       let parsed = {};
+      
       for(let key of keys) {
-        parsed[key] = _fields[_fieldLookup[key]];
+        console.log(_fields.get(key));
+        parsed[key] = _fields.get(key);
       }
       return parsed;
     })

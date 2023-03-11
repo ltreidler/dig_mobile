@@ -7,40 +7,56 @@ const parseNeo = require('../db/utils');
 // to do: filters for age, location, breed, etc.
 router.get('/', async (req, res, next) => {
     try {
-        
+        let {page} = req.query || 1;
+        if(isNaN(Number(page)) || page < 1) page = 1;
+        const offset = (page - 1) * 10;
+
+        const dogId = 1244;
+
         const session = driver.session();
-        const dogName = 'Rod';
 
-        const queryByLike = `
-        MATCH (d1:Dog {name: $dogName})-[:LIKED]->(d3:Dog)<-[:LIKED]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED]->(d2)
-        AND NOT (d1)-[:DISLIKED]->(d2)
-        RETURN count(DISTINCT d2) as frequency, d2.name AS name, d2.energy AS energy, d2.weight AS weight, d2.sex AS sex, ID(d2) AS id
-        ORDER BY frequency DESC
-        LIMIT 20
-        `;
-
-        const queryByBreed = `
-        MATCH (d1:Dog {name: $dogName})-[:IS_A]->(b:Breed)<-[:IS_A]-(d2:dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED]->(d2)
-        AND NOT (d1)-[:DISLIKED]->(d2)
-        RETURN d2.name AS name, d2.energy AS energy, d2.weight AS weight, d2.sex AS sex, ID(d2) AS id
+        const query = `
+        MATCH (d1:Dog)-[r1*]->(n)<-[r2*]-(d2:Dog)
+        WHERE id(d1) = $dogId
+        AND d1 <> d2
+        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
+        UNWIND r1 as rel1
+        UNWIND r2 as rel2
+        WITH SUM(rel1.weight*rel2.weight) AS similarity, d2 AS match, ID(d2) as id, count(*) as frequency
+        MATCH (match)-[:IS_A|IS_SIZE|IS_SEX|HAS_ENERGY|IS_AGE]->(b)
+        RETURN similarity, id, match.name AS name, match.image AS image, frequency, collect(b) AS details
+        ORDER BY similarity DESC
+        SKIP ${offset}
+        LIMIT 10
         `;
 
         const data = await session.executeWrite((tx) => 
-            Promise.all([queryByLike, queryByBreed].map(query => 
-                tx.run(query, {dogName}))));
+            tx.run(query, {dogId}));
 
-        let byLikes = data[0].records;
-        console.log(parseNeo(byLikes));
+        //console.log(data.records[0].get('details')[0].properties.name);
+        console.log(data.records[0].get('details'));
         
-        console.log(byLikes.records, data.records);
+        const matches = data.records.map(record => {
+            const details = record.get('details').reduce((all, node) => {
+                let label = node.labels[0].toLowerCase();
+                all[label] = node.properties[Object.keys(node.properties)[0]];
+                return all;
+            }, {});
+
+            return {
+                id: record.get('id').toNumber(),
+                similarity: record.get('similarity'),
+                name: record.get('name'),
+                image: record.get('image'),
+                ...details
+            }
+        })
+
+        res.send(matches);
 
         await session.close();
 
-        res.json();
+        
     
     }   catch (err) {
         next(err);

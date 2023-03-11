@@ -48,15 +48,17 @@ const apiHash = {
 
 async function createDogs(n) {
   try {
-    const possibleBreeds = Object.keys(apiHash);
-    //get some dog breed ids based on the api hash
-    const breedIds = [21, 103].concat(Array(Math.ceil(n / 20))
-      .fill(1)
-      .map(() => {
-        return possibleBreeds[
-          Math.floor(Math.random() * possibleBreeds.length)
-        ];
-      }))
+
+      let breedIds = Object.keys(apiHash);
+
+      //shuffle the breedIds
+      for (let i = breedIds.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [breedIds[i], breedIds[j]] = [breedIds[j], breedIds[i]]; 
+      }
+      
+      breedIds = breedIds.slice(0, 4);
+      console.log(breedIds);
 
     //get those dog breeds
     let breeds = await Promise.all(
@@ -78,16 +80,8 @@ async function createDogs(n) {
     const breedGroups = Object.keys(groups);
 
     //create a random number of each breed, saving them in arrays
-    let count = n;
     const dogsNums = Array(breedIds.length)
-      .fill(1)
-      .map((el, i) => {
-        if(i === breedIds.length - 1) return n - count;
-
-        let num = Math.floor(Math.random() * count * 0.85);
-        count -= num;
-        return num + el;
-      });
+      .fill(Math.floor(n/breedIds.length));
 
       let emailHash = {};
       let usernameHash = {};
@@ -97,16 +91,39 @@ async function createDogs(n) {
       })
     );
 
-    const {relationships, matched} = assignRelationships(dogsByBreed.flat());
+    const dogs = dogsByBreed.flat().map(({weight, energy, age, ...rest}) => {
+      let size;
+      if(weight < 30) size = 'Small';
+      else if(weight < 50) size = 'Medium';
+      else if(weight < 80) size = 'Large';
+      else size = 'XLarge';
+
+      if(energy <= 3) energy = 'Low';
+      else if(energy <= 6) energy = 'Medium';
+      else energy = 'High';
+
+      if(age < 2) age = 'Puppy';
+      else if(age < 4) age = 'Young';
+      else if(age < 9) age = 'Adult';
+      else age = 'Senior';
+
+      return {
+        size,
+        energy,
+        age,
+        ...rest 
+      }
+    })
+
+    const {relationships} = assignRelationships(dogsByBreed.flat());
 
     return {
       breeds: breeds.map((breed) => {
         return { breed_group: breed.breed_group, breed_name: breed.name };
       }),
       breedGroups,
-      dogs: dogsByBreed.flat(),
-      relationships,
-      matched
+      dogs,
+      relationships
     };
   } catch (err) {
     console.error(err);
@@ -114,12 +131,10 @@ async function createDogs(n) {
 }
 
 async function createDogBreedArr(breed, num, emailHash, usernameHash) {
-  let [max, min] = breed.weight.imperial
-    .split("-")
-    .map((weight) => Number(weight.trim()));
-  if (isNaN(max) || isNaN(min)) {
-    max = 35;
-    min = 25;
+  let [max, min] = breed.weight.imperial.split('-').map(num => Number(num.trim()));
+  if(isNaN(max) || isNaN(min)) {
+    max = 50;
+    min = 10;
   }
   const maxLifeSpan = Number(breed.life_span.split("-")[0].trim());
 
@@ -147,7 +162,7 @@ async function createDogBreedArr(breed, num, emailHash, usernameHash) {
     let email = faker.internet.email().toLowerCase() + Math.floor(Math.random()*400);;
 
     let image = images[i];
-    let weight = Math.floor(Math.random() * (max - min + 1)) + min;
+    let weight = Math.max(Math.floor(Math.random() * (max - min + 1)) + min - (maxLifeSpan-(age*1.5)), 3);
     const password = name.toLowerCase() + '_pass';
     const sex = ["M", "F"][Math.floor(Math.random() * 2)];
 
@@ -173,10 +188,10 @@ function assignRelationships(dogs, breeds) {
     const relationships = [];
     const matched = [];
 
-    for(let i = 0; i < dogs.length; i += 5) {
+    for(let i = 0; i < dogs.length; i += 6) {
         const dog1 = dogs[i];
 
-        for(let j = i + 1; j < dogs.length; j += 5) {
+        for(let j = i + 1; j < dogs.length; j += 6) {
             const dog2 = dogs[j];
 
             const [rel1, rel2] = chooseRelationships(dog1, dog2, breeds);
@@ -263,7 +278,6 @@ function assignRelationship(distanceScore) {
     for (let rel in relProbs) {
       cumulativeProb += relProbs[rel];
       const randomFactor = Math.random() * 0.2 - 0.1;
-      if(Math.random() < 0.7) return 'none';
       if(Math.random() < 0.2) return 'LIKED';
       if (distanceScore <= cumulativeProb + randomFactor) {
         return rel;
