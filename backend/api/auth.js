@@ -11,25 +11,29 @@ router.put('/login', async (req, res, next) => {
         const query = `
         MATCH (dog:Dog {username: $username, password: $password})
         WITH dog
-        MATCH (dog)-[:IS_A|IS_SIZE|IS_SEX|HAS_ENERGY|IS_AGE]->(b)
-        RETURN dog.username AS username, id(dog) AS id, collect(b) AS details`;
+        MATCH (dog)-[]->(trait)
+        WHERE NOT labels(trait)[0] = 'Dog'
+        RETURN dog.username AS username, dog.name AS name, id(dog) AS id, dog.image AS image, collect(trait.name) AS traits, collect(labels(trait)[0]) AS trait_labels`;
 
         let data = await session.executeWrite((tx) => 
             tx.run(query, {username, password}));
 
         if(!data || !data.records.length) throw new Error('Dog not found');
 
-        data = data.records[0];
+        record = data.records[0];
 
-        const details = data.get('details').reduce((all, node) => {
-            let label = node.labels[0].toLowerCase();
-            all[label] = node.properties[Object.keys(node.properties)[0]];
-            return all;
-        }, {});
+        const details = {};
+
+        const traits = record.get('traits');
+        for(let i = 0; i < traits.length; i++) {
+            details[record.get('trait_labels')[i].toLowerCase()] = traits[i];
+        }
 
         const dog = {
-            id: data.get('id').toNumber(),
-            username: data.get('username'),
+            id: record.get('id').toNumber(),
+            username: record.get('username'),
+            image: record.get('image'),
+            name: record.get('name'),
             ...details
         }
 

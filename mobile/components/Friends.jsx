@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { FlatList, Animated, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator, Image, SafeAreaView } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchMatches, selectMatches, dislike, like } from "../features/matchesSlice";
-import { selectAuth } from "../features/authSlice";
-import MatchModal from "./MatchModal";
+import { fetchFriends } from "../features/matchesSlice";
 
 const MatchesPage = ({navigation}) => {
   const [loading, setLoading] = useState(true);
-  const [matches, setMatches] = useState([]);
+  const [friends, setFriends] = useState([]);
   const [lastPage, setLastPage] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [newMatch, setNewMatch] = useState({});
@@ -20,7 +18,11 @@ const MatchesPage = ({navigation}) => {
   //initially, get the state
   useEffect(() => {
     if(!user.id) return;
-    else dispatch(fetchMatches({id: user.id}));
+    else {
+        const {id} = user;
+        console.log('ID!!!', id);
+        dispatch(fetchMatches(id));
+    }
   }, [dispatch, user])
 
   //when new match data is fetched
@@ -34,9 +36,10 @@ const MatchesPage = ({navigation}) => {
 
   const handleEndReached = () => {
     if(lastPage) return;
-    else if (!loading) {
+    else if (!loading && user && user.id) {
       setLoading(true);
       dispatch(fetchMatches(user.id));
+      setPage(page + 1);
     }
   };
 
@@ -48,6 +51,7 @@ const MatchesPage = ({navigation}) => {
   };
 
   const onLike = (match) => {
+    console.log('like');
     dispatch(like({id: user.id, matchId: match.id, matched: match.matched}));
     if(match.matched) {
       setNewMatch(match);
@@ -58,6 +62,7 @@ const MatchesPage = ({navigation}) => {
   }
 
   const onDislike = (matchId) => {
+    console.log('dislike', user.id, matchId);
     dispatch(dislike({id: user.id, matchId}));
     removeMatch(matchId);
   }
@@ -76,7 +81,7 @@ const MatchesPage = ({navigation}) => {
     navigation.navigate('Profile', {
       profile: newMatch,
       self: false,
-      message: 'You just matched!' 
+      message: 'You just matched!'
     });
   }
 

@@ -15,7 +15,7 @@ router.get('/', async (req, res, next) => {
 
         const query = `
         OPTIONAL MATCH p = (d1:Dog)-[:LIKED|DISLIKED]-(d:Dog)-[:LIKED|DISLIKED]-(d2:Dog)
-        WHERE id(d1) = $id AND d1 <> d2 AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
+        WHERE id(d1) = $id AND d1 <> d2 AND NOT (d1)-[:LIKED|DISLIKED]->(d2) AND NOT (d1)-[:FRIENDS_WITH]-(d2)
         WITH d1, d2, REDUCE(s = 0, r IN collect(relationships(p)) | s + (r[0].weight * r[1].weight)) AS rels_similarity
 
         OPTIONAL MATCH (d1)-[r:SAW]->(d2)
@@ -27,7 +27,10 @@ router.get('/', async (req, res, next) => {
         WHERE jacc >= 0.1 AND similarity >= 0.1
 
         OPTIONAL MATCH (d2)-[r:LIKED]->(d1)
-        WITH d2, COALESCE(r.weight*1.5, 0) AS match_score, jacc, similarity, d1 
+        WITH d2, COALESCE(r.weight*1.5, 0) AS match_score, jacc, similarity, d1
+        
+        OPTIONAL MATCH (d2)-[:FRIENDS_WITH]-(n)-[:FRIENDS_WITH]-(d1)
+        WITH .....
 
         MATCH (d2)-[]->(trait)
         WHERE NOT labels(trait)[0] = 'Dog'
@@ -36,7 +39,7 @@ router.get('/', async (req, res, next) => {
         LIMIT 10
         MERGE (d1)-[r:SAW]->(d2)
         SET r.timestamp = datetime()     
-        RETURN d2.name AS name, d2.image AS image, id(d2) AS id, score, traits, trait_labels, match_score
+        RETURN d2.name AS name, d2.image AS image, d2.username AS username, id(d2) AS id, score, traits, trait_labels, match_score
         `;
 
         const data = await session.executeWrite((tx) => 
@@ -55,6 +58,7 @@ router.get('/', async (req, res, next) => {
                 id: record.get('id').toNumber(),
                 name: record.get('name'),
                 image: record.get('image'),
+                username: record.get('username'),
                 matched,
                 score: record.get('match_score'),
                 ...all_traits
@@ -71,6 +75,52 @@ router.get('/', async (req, res, next) => {
     } 
 })
 
+// /api/friends
+// sends back the user's friends
+router.get('/friends', async (req, res, next) => {
+    try {
+        const {id} = req.query;
+
+        const session = driver.session();
+
+        const query = `
+        MATCH (d:Dog)-[:FRIENDS_WITH]-(d2:Dog)
+        WHERE id(d) = $id AND d2 <> d
+        MATCH (d2)-[]->(trait)
+        WHERE NOT labels(trait)[0] = 'Dog'
+        RETURN collect(trait.name) AS traits, collect(labels(trait)[0]) AS trait_labels, d2.name AS name, d2.image AS image, d2.username AS username, id(d2) AS id
+        `;
+
+        const data = await session.executeWrite((tx) => 
+            tx.run(query, {id: neo4j.int(id)}));
+        
+        const friends = data.records.map(record => {
+            const traits = record.get('traits');
+            const all_traits = {};
+            for(let i = 0; i < traits.length; i++) {
+                all_traits[record.get('trait_labels')[i].toLowerCase()] = traits[i];
+            }
+
+            return {
+                id: record.get('id').toNumber(),
+                name: record.get('name'),
+                image: record.get('image'),
+                username: record.get('username'),
+                ...all_traits
+            }
+
+        })
+
+
+        await session.close();
+
+        res.json(friends);
+
+    } catch(err) {
+        next(err);
+    }
+})
+
 // /api/matches/like
 // creates like relationship, sends back whether the other user has also liked
 router.post('/like', async (req, res, next) => {
@@ -83,16 +133,12 @@ router.post('/like', async (req, res, next) => {
         const query = `
         MATCH (d:Dog), (m:Dog)
         WHERE id(d) = $id AND id(m) = $matchId
-        MERGE (d)-[r1:LIKED]->(m)
-        SET r1.weight = 0.5
-        WITH d, m
-        MATCH (m)-[r:LIKED]->(d)
-        RETURN r AS relationship`;
+        MERGE (d)-[l:LIKED]->(m)
+        SET l.weight = 0.5
+        `;
 
-        const data = await session.executeWrite((tx) => 
+        await session.executeWrite((tx) => 
             tx.run(query, {id: neo4j.int(id), matchId: neo4j.int(matchId)}));
-
-        console.log(data.records[0]);
 
         await session.close();
 
@@ -123,6 +169,36 @@ router.post('/dislike', async (req, res, next) => {
         await session.close();
 
         res.send();
+
+    } catch (err) {
+        next(err);
+    }
+})
+
+// /api/matches/dislike/:dogId
+// creates dislike relationship
+router.post('/friend', async (req, res, next) => {
+    try {
+        const {id, matchId} = req.body;
+
+        const session = driver.session();
+
+        const query = `
+        MATCH (f:Dog)-[r2:LIKED]->(d:Dog)
+        WHERE id(d) = $id AND id(f) = $matchId
+        WITH d, f, r2
+        DELETE r2
+        WITH d, f
+        MERGE (d)-[r:FRIENDS_WITH]-(f)`;
+
+        await session.executeWrite((tx) => 
+            tx.run(query, {id: neo4j.int(id), matchId: neo4j.int(matchId)}));
+
+        
+
+        await session.close();
+
+        res.status(201).send();
 
     } catch (err) {
         next(err);

@@ -1,22 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 
-const DogProfile = ({ route, navigation }) => {
-
-  const {profile, self, time} = route.params;
+const DogProfile = ({ route }) => {
+  console.log(route.params);
+  const {profile, self, message} = route.params;
 
   const {image, username, name, breed, age, size} = profile;
 
   return (
     <View style={styles.container}>
+      {self && <Text style={styles.username}>Hi, {name}!</Text>}
+      {message && <Text style={styles.username}>{message}</Text>}
       <Image source={{ uri: image }} style={styles.image} />
-      <Text style={styles.username}>{username}</Text>
-      <Text style={styles.name}>{name}</Text>
-      <Text style={styles.breed}>{breed}</Text>
-      <Text style={styles.age}>{age} years old</Text>
-      <Text style={styles.size}>{size}</Text>
+      <Text style={styles.name}>Username: {username}</Text>
+      <Text style={styles.breed}>Breed: {breed}</Text>
+      <Text style={styles.age}>Age: {age}</Text>
+      <Text style={styles.size}>Size: {size}</Text>
     </View>
   );
+
 };
 
 const styles = StyleSheet.create({
@@ -25,31 +27,32 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   image: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 275,
+    height: 275,
+    borderRadius: 100,
     marginBottom: 10,
+    marginTop: 20
   },
   username: {
-    fontSize: 20,
+    fontSize: 40,
     fontWeight: 'bold',
     marginBottom: 5,
   },
   name: {
-    fontSize: 16,
+    fontSize: 25,
     fontWeight: 'bold',
     marginBottom: 5,
   },
   breed: {
-    fontSize: 16,
+    fontSize: 25,
     marginBottom: 5,
   },
   age: {
-    fontSize: 16,
+    fontSize: 25,
     marginBottom: 5,
   },
   size: {
-    fontSize: 16,
+    fontSize: 25,
     marginBottom: 5,
   },
   friendshipStatus: {

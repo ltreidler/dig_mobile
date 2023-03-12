@@ -4,10 +4,10 @@ import apiClient from "../api";
 /*
   THUNKS
 */
-export const fetchMatches = createAsyncThunk('matches/fetch', async ({page,id}) => {
+export const fetchMatches = createAsyncThunk('matches/fetch', async ({id}) => {
   try {
     if(!id) throw new Error('User id required');
-
+    console.log(id);
     const {data} = await apiClient.get(`/matches?id=${id}`)
 
     return {matches: data, error: null};
@@ -33,20 +33,19 @@ export const dislike = createAsyncThunk('matches/dislike', async ({id, matchId})
 
 });
 
-export const like = createAsyncThunk('matches/like', async ({id, matchId}) => {
+export const like = createAsyncThunk('matches/like', async ({id, matchId, matched}) => {
   try {
-    console.log('like!');
     if(!id || !matchId) throw new Error('User id and match id required');
-    console.log('like!');
+    console.log(id, matchId, matched);
 
-    const res = await apiClient.post(`/matches/like`, {id, matchId});
+    const q = matched ? 'friend' : 'like'
+    const res = await apiClient.post(`/matches/${q}`, {id, matchId});
 
     if(res.status === 201) return matchId;
 
   } catch (err) {
     console.error(err);
   }
-
 });
 
 
