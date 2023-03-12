@@ -15,10 +15,10 @@ async function seed() {
   try {
     console.log("Seeding...");
 
-    console.log("Clearing db...");
-    await clearDb();
+    //console.log("Clearing db...");
+    //await clearDb();
 
-    const { breeds, breedGroups, dogs, relationships} = await createDogs(200);
+    const { breeds, breedGroups, dogs, relationships} = await createDogs(500);
 
     console.log(relationships.length, dogs.length, breeds.length);
     
@@ -44,23 +44,26 @@ async function seed() {
             `
                         MATCH (g:Group)
                         WHERE g.name = $breed_group
-                        CREATE (b:Breed {name: $breed_name})-[:BELONGS_TO]->(g)`,
+                        CREATE (b:Breed {name: $breed_name, weight: 0.5})-[:BELONGS_TO]->(g)`,
             breed
           )
         )
       )
     );
 
-    const gender = `MERGE (s1:Sex {type: 'F'}) MERGE (s2:Sex {type: 'M'})`
-    const size = `MERGE (sz1:Size {category: 'Small'}) MERGE (sz2:Size {category: 'Medium'}) MERGE (sz3:Size {category: 'Large'}) MERGE (sz4:Size {category: 'XLarge'})`;
-    const energy = `MERGE (e1:Energy {level: 'Low'}) MERGE (e2:Energy {level: 'Medium'}) MERGE (e3:Energy {level: 'High'})`
-    const age = `MERGE (a1:Age {category: 'Puppy'}) MERGE (a2:Age {category: 'Young'}) MERGE (a3:Age {category: 'Adult'}) MERGE (a4:Age {category: 'Senior'})`
+    console.log('seeding traits...');
+
+    const gender = `MERGE (s1:Sex {name: 'F', weight: 0.2}) MERGE (s2:Sex {name: 'M', weight: 0.2})`
+    const size = `MERGE (sz1:Size {name: 'Small', weight: 0.3}) MERGE (sz2:Size {name: 'Medium', weight: 0.3}) MERGE (sz3:Size {name: 'Large', weight: 0.3}) MERGE (sz4:Size {name: 'XLarge', weight: 0.3})`;
+    const energy = `MERGE (e1:Energy {name: 'Low', weight: 0.7}) MERGE (e2:Energy {name: 'Medium', weight: 0.7}) MERGE (e3:Energy {name: 'High', weight: 0.7})`
+    const age = `MERGE (a1:Age {name: 'Puppy', weight: 0.6}) MERGE (a2:Age {name: 'Young', weight: 0.6}) MERGE (a3:Age {name: 'Adult', weight: 0.6}) MERGE (a4:Age {name: 'Senior', weight: 0.6})`
 
     await session.executeWrite((tx) =>
         Promise.all([gender, size, energy, age].map((query) => tx.run(query)))
     );
 
-    
+    console.log('seeding dogs...');
+    console.log(dogs.slice(0,10));
     //create dogs, attaching to their breeds w/relationships (IS-A)
     await session.executeWrite((tx) =>
       Promise.all(
@@ -71,17 +74,17 @@ async function seed() {
                         CREATE (d:Dog)-[:IS_A]->(b)
                         SET d.name = $name, d.username = $username, d.image = $image, d.password = $password, d.email = $email
                         WITH d
-                        MATCH(sz:Size {category: $size})
-                        MERGE (d)-[r1:IS_SIZE {weight: 0.3}]->(sz)
+                        MATCH(sz:Size {name: $size})
+                        MERGE (d)-[r1:HAS_TRAIT]->(sz)
                         WITH d
-                        MATCH(s:Sex {type: $sex})
-                        MERGE (d)-[r2:IS_SEX {weight: 0.1}]->(s)
+                        MATCH(s:Sex {name: $sex})
+                        MERGE (d)-[r2:HAS_TRAIT]->(s)
                         WITH d
-                        MATCH(e:Energy {level: $energy})
-                        MERGE (d)-[r3:HAS_ENERGY {weight: 0.5}]->(e)
+                        MATCH(e:Energy {name: $energy})
+                        MERGE (d)-[r3:HAS_TRAIT]->(e)
                         WITH d
-                        MATCH(a:Age {category: $age})
-                        MERGE (d)-[r4:IS_AGE {weight: 0.4}]->(a)
+                        MATCH(a:Age {name: $age})
+                        MERGE (d)-[r4:HAS_TRAIT ]->(a)
                         `, dog
           )
         )
@@ -89,9 +92,12 @@ async function seed() {
     );
 
     const weights = {
-        'LIKED': 0.7,
-        'DISLIKED': -0.7
+        'LIKED': 0.5,
+        'DISLIKED': -0.5
     }
+
+    console.log('seeding relationships...');
+    console.log(relationships.slice(0,10))
 
     await session.executeWrite((tx) => 
         Promise.all(
@@ -105,124 +111,6 @@ async function seed() {
                     {d1_name: dog1.name, d1_username: dog1.username, d1_email: dog1.email, d2_name: dog2.name, d2_username: dog2.username, d2_email: dog2.email, weight: weights[rel]}
                 ))
         ));
-
-        const q = `
-        MATCH (d1:Dog), (d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 300
-        CREATE (d1)-[:LIKED {weight: 0.5}]->(d2)`
-
-        const q0 = `
-        MATCH (d1:Dog), (d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[:LIKED {weight: 0.5}]->(d2)`
-
-        const q1 = `
-        MATCH (d1:Dog)-[r*]->(:Energy)<-[r*]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: 0.5}]->(d2)`
-
-        const q2 = `
-        MATCH (d1:Dog)-[r*]->(:Size)<-[r*]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: 0.5}]->(d2)`
-
-        const q3 = `
-        MATCH (d1:Dog)-[r*]->(:Breed)<-[r*]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: -0.5}]->(d2)`
-
-        const q4 = `
-        MATCH (d1:Dog)-[:LIKED]->(n:Dog)<-[:LIKED]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: 0.5}]->(d2)`
-
-        const q5 = `
-        MATCH (d1:Dog)-[:LIKED]->(n:Dog)<-[:DISLIKED]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:DISLIKED {weight: -0.5}]->(d2)`
-
-        const q6 = `
-        MATCH (d1:Dog)-[:LIKED]->(n:Dog)<-[:LIKED]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: 0.5}]->(d2)`
-
-        const q7 = `
-        MATCH (d1:Dog)-[:DISLIKED]->(n:Dog)<-[:DISLIKED]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: 0.5}]->(d2)`
-
-        const q8 = `
-        MATCH (d1:Dog)-[:DISLIKED]->(n:Dog)<-[:LIKED]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[r:LIKED {weight: 0.5}]->(d2)`
-
-        const q9 = `
-        MATCH (d1:Dog)-[:HAS_ENERGY]->(:Energy)<-[:HAS_ENERGY]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[:LIKED {weight: 0.5}]->(d2)`
-
-        const q10 = `
-        MATCH (d1:Dog)-[:IS_AGE]->(:Age)<-[:IS_AGE]-(d2:Dog)
-        WHERE d1 <> d2
-        AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
-        WITH d1, d2
-        WHERE (d1)-[:IS_A]->(:Breed)<-[:IS_A]-(d2)
-        WITH d1, d2
-        ORDER BY rand() LIMIT 100
-        CREATE (d1)-[:DISLIKED {weight: 0.5}]->(d2)`
-
-        
-    
-      //   await session.executeWrite((tx) =>
-      // Promise.all(
-      //   [q].map((query) =>
-      //     tx.run(query)
-      //   )));
 
     console.log("Success!");
   } catch (err) {

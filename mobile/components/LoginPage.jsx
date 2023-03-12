@@ -26,7 +26,7 @@ const LoginPage = ({navigation}) => {
     }, [auth])
 
     function validLogin() {
-        if(username.length > 5 && password.length > 5) return true;
+        if(username.length > 1 && password.length > 1) return true;
         return false;
     }
 

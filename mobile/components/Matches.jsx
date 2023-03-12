@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { FlatList, SafeAreaView, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator, Image } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { FlatList, Animated, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator, Image, SafeAreaView } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchMatches, selectMatches } from "../features/matchesSlice";
+import { fetchMatches, selectMatches, dislike, like } from "../features/matchesSlice";
 import { selectAuth } from "../features/authSlice";
+import MatchModal from "./MatchModal";
 
-const MatchesPage = () => {
+const MatchesPage = ({navigation}) => {
 
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [matches, setMatches] = useState([]);
   const [lastPage, setLastPage] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newMatch, setNewMatch] = useState({});
 
   const {user} = useSelector(selectAuth);
   const dispatch = useDispatch();
@@ -47,28 +50,58 @@ const MatchesPage = () => {
     return loading ? <ActivityIndicator size="large" color="#000" /> : null;
   };
 
-  const onLike = () => {
-    console.log('Like!');
+  const onLike = (match) => {
+    console.log('like');
+    dispatch(like({id: user.id, matchId: match.id}));
+    if(match.matched) {
+      setNewMatch(match);
+      setModalVisible(true);
+    } else {
+      removeMatch(match.id);
+    }
   }
 
-  const onDislike = () => {
-    console.log('Dislike!');
+  const onDislike = (matchId) => {
+    console.log('dislike', user.id, matchId);
+    dispatch(dislike({id: user.id, matchId}));
+    removeMatch(matchId);
   }
 
-  const renderMatch = ({ image, name, breed, age, energy, size, sex}) => {
+  const closeModal = () => {
+    console.log('closing');
+    setModalVisible(false);
+    setNewMatch({});
+    removeMatch(newMatch.id)
+  }
+
+  const seeProfile = () => {
+    navigation.navigate('DogProfile', {
+      itemId: 86,
+      otherParam: 'anything you want here',
+    });
+  }
+
+  const removeMatch = (removeId) => {
+    const updated = matches.filter(({id}) => id !== removeId);
+    setMatches(updated);
+  }
+
+  const renderMatch = ({ image, name, breed, age, energy, id, matched}) => {
+
     return (
       <View style={styles.card}>
         <Image source={{ uri: image }} style={styles.image} />
         <View style={styles.details}>
           <Text style={styles.name}>{name}</Text>
-          <Text>{breed}</Text>
-          <Text>{age}</Text>
+          <Text>Breed: {breed}</Text>
+          <Text>Age: {age}</Text>
+          <Text>Energy: {energy} Match: {matched}</Text>
         </View>
         <View style={styles.buttons}>
-          <TouchableOpacity onPress={onDislike} style={styles.button}>
+          <TouchableOpacity onPress={() => onDislike(id)} style={styles.button}>
             <Text style={styles.buttonText}>Dislike</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={onLike} style={[styles.button, styles.likeButton]}>
+          <TouchableOpacity onPress={() => onLike({id, name, matched})} style={[styles.button, styles.likeButton]}>
             <Text style={styles.buttonText}>Like</Text>
           </TouchableOpacity>
         </View>
@@ -76,7 +109,10 @@ const MatchesPage = () => {
     );
   };
 
+
   return (
+    <SafeAreaView>
+    <MatchModal match={newMatch} onClose={closeModal} seeProfile={seeProfile} visible={modalVisible}/>
       <FlatList
         data={matches}
         keyExtractor={(match,i) => `${match.id}-${i}`}
@@ -85,6 +121,7 @@ const MatchesPage = () => {
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
       />
+      </SafeAreaView>
   );
 };
 
@@ -127,8 +164,7 @@ const styles = StyleSheet.create({
       alignItems: 'center',
     },
     likeButton: {
-      backgroundColor: '#ff7979',
-      borderColor: '#ff7979',
+      backgroundColor: '#FFA500'
     },
     buttonText: {
       fontSize: 16,
