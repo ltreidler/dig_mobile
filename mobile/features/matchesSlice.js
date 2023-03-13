@@ -4,8 +4,9 @@ import apiClient from "../api";
 /*
   THUNKS
 */
-export const fetchMatches = createAsyncThunk('matches/fetch', async ({id}) => {
+export const fetchMatches = createAsyncThunk('matches/fetch', async (id) => {
   try {
+    console.log(id);
     if(!id) throw new Error('User id required');
     console.log(id);
     const {data} = await apiClient.get(`/matches?id=${id}`)

@@ -10,10 +10,11 @@ export const loginAsync = createAsyncThunk('auth/login', async ({username, passw
     if(!password || !username) throw new Error('Invalid login info');
     const {data} = await apiClient.put('/auth/login', {username, password});
 
+    if(!data.id) return {user: [], error: "Error logging in"};
+
     return {user: data, error: null};
 
   } catch (err) {
-
     console.error(err);
     return {user: {}, error: err.message};
   }

@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { FlatList, Animated, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator, Image, SafeAreaView } from "react-native";
+import { FlatList, TouchableOpacity, View, StyleSheet, Text, ActivityIndicator, Image, SafeAreaView } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchFriends } from "../features/matchesSlice";
+import { fetchFriends, selectFriends } from "../features/friendsSlice";
+import { selectAuth } from "../features/authSlice";
 
-const MatchesPage = ({navigation}) => {
+const FriendsPage = ({navigation}) => {
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [friends, setFriends] = useState([]);
   const [lastPage, setLastPage] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [newMatch, setNewMatch] = useState({});
 
   const {user} = useSelector(selectAuth);
   const dispatch = useDispatch();
-  const { matches: newMatches} = useSelector(selectMatches);
+  const { friends: friendsData } = useSelector(selectFriends);
   
 
   //initially, get the state
@@ -20,25 +20,24 @@ const MatchesPage = ({navigation}) => {
     if(!user.id) return;
     else {
         const {id} = user;
-        console.log('ID!!!', id);
-        dispatch(fetchMatches(id));
+        dispatch(fetchFriends({id, page}));
     }
-  }, [dispatch, user])
+  }, [user])
 
-  //when new match data is fetched
+  //when new friend data is fetched
   useEffect(() => {
-    if(newMatches && newMatches.length) {
+    if(friendsData && friendsData.length) {
         setLoading(false);
-        setMatches([...matches, ...newMatches]);
-        if(newMatches.length < 10) setLastPage(true);
+        setFriends([...friends, ...friendsData]);
+        if(friendsData.length < 10) setLastPage(true);
     }
-  }, [newMatches])
+  }, [friendsData])
 
   const handleEndReached = () => {
     if(lastPage) return;
     else if (!loading && user && user.id) {
       setLoading(true);
-      dispatch(fetchMatches(user.id));
+      dispatch(fetchFriends({id: user.id, page: page + 1}));
       setPage(page + 1);
     }
   };
@@ -50,48 +49,17 @@ const MatchesPage = ({navigation}) => {
     return loading ? <ActivityIndicator size="large" color="#000" /> : null;
   };
 
-  const onLike = (match) => {
-    console.log('like');
-    dispatch(like({id: user.id, matchId: match.id, matched: match.matched}));
-    if(match.matched) {
-      setNewMatch(match);
-      setModalVisible(true);
-    } else {
-      removeMatch(match.id);
-    }
-  }
-
-  const onDislike = (matchId) => {
-    console.log('dislike', user.id, matchId);
-    dispatch(dislike({id: user.id, matchId}));
-    removeMatch(matchId);
-  }
-
-  const closeModal = () => {
-    console.log('closing');
-    setModalVisible(false);
-    setNewMatch({});
-    removeMatch(newMatch.id)
-  }
-
-  const seeProfile = () => {
-    removeMatch(newMatch.id);
-    setModalVisible(false);
-    setNewMatch({});
-    navigation.navigate('Profile', {
-      profile: newMatch,
+  const seeProfile = (friend) => {
+    navigation.navigate('User', {
+      profile: friend,
       self: false,
-      message: 'You just matched!'
+      message: 'Hi, friend!'
     });
   }
 
-  const removeMatch = (removeId) => {
-    const updated = matches.filter(({id}) => id !== removeId);
-    setMatches(updated);
-  }
 
-  const renderMatch = (match) => {
-    const { image, name, breed, age, energy, id, matched} = match;
+  const renderFriend = (friend) => {
+    const { image, name, breed, age, energy, id} = friend;
 
     return (
       <View style={styles.card}>
@@ -100,14 +68,11 @@ const MatchesPage = ({navigation}) => {
           <Text style={styles.name}>{name}</Text>
           <Text>Breed: {breed}</Text>
           <Text>Age: {age}</Text>
-          <Text>Energy: {energy} Match: {matched}</Text>
+          <Text>Energy: {energy}</Text>
         </View>
         <View style={styles.buttons}>
-          <TouchableOpacity onPress={() => onDislike(id)} style={styles.button}>
-            <Text style={styles.buttonText}>Dislike</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => onLike(match)} style={[styles.button, styles.likeButton]}>
-            <Text style={styles.buttonText}>Like</Text>
+          <TouchableOpacity onPress={() => seeProfile(friend)} style={[styles.button, styles.likeButton]}>
+            <Text style={styles.buttonText}>See profile</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -117,15 +82,14 @@ const MatchesPage = ({navigation}) => {
 
   return (
     <SafeAreaView>
-    <MatchModal match={newMatch} onClose={closeModal} seeProfile={seeProfile} visible={modalVisible}/>
-      <FlatList
-        data={matches}
-        keyExtractor={(match,i) => `${match.id}-${i}`}
-        renderItem={({item}) => renderMatch(item)}
+      {friends && friends.length ? <FlatList
+        data={friends}
+        keyExtractor={(f,i) => `${f.id}-${i}`}
+        renderItem={({item}) => renderFriend(item)}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-      />
+      /> : <Text>You don't have any friends yet :/{JSON.stringify(friendsData)}</Text>}
       </SafeAreaView>
   );
 };
@@ -177,4 +141,4 @@ const styles = StyleSheet.create({
     },
   });
 
-export default MatchesPage;
+export default FriendsPage;

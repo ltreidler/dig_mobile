@@ -55,6 +55,7 @@ const LoginPage = ({navigation}) => {
               onChangeText={setPassword}
             />
             <Button title="Login" onPress={handleLogin} disabled={!validLogin() || loading}/>
+            {error && error.length && <Text>{error}</Text>}
           </View>
         </SafeAreaView>
       );

@@ -9,7 +9,7 @@ const init = async () => {
         await driver.getServerInfo();
         console.log('Successfully connected!');
 
-        app.listen(PORT, () => console.log(`Mixing it up on port ${PORT}`))
+        app.listen(PORT, () => console.log(`Listening on ${PORT}`))
     } catch(err) {
         console.error(err);
     }

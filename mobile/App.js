@@ -11,41 +11,12 @@ import store from './features/store';
 import LoginPage from './components/LoginPage';
 import MatchesPage from './components/Matches';
 import DogProfile from './components/DogProfile';
+import FriendsPage from './components/Friends';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const options = {
-  headerStyle: {
-    backgroundColor: '#62ab48',
-  },
-  headerTintColor: '#fff',
-  headerTitleStyle: {
-    fontWeight: 'bold',
-  },
-  headerRight: () => (
-    <View style={{ flexDirection: 'row' }}>
-      <Button
-        onPress={({navigation}) => navigation.navigate('Friends')}
-        title="Friends"
-        color="#fff"
-      />
-      <Button
-        onPress={({navigation}) => navigation.navigate('Profile', {
-          title: 'Your Profile',
-          self: true,
-          time: null
-        })}
-        title="Profile"
-        color="#fff"
-      />
-    </View>
-  ),
-};
-
 export default function App() {
-
-  
 
   return (
     <Provider store={store}>
@@ -58,9 +29,9 @@ const Navigation = () => {
   const auth = useSelector(selectAuth);
 
   return (
-    <>
+    <NavigationContainer>
       {auth.user && auth.user.id ? <TabNavigation /> : <StackNavigation />}
-    </>
+    </NavigationContainer>
   )
 }
 
@@ -68,7 +39,6 @@ const TabNavigation = () => {
   const {user} = useSelector(selectAuth);
 
   return (
-    <NavigationContainer>
         <Tab.Navigator initialRouteName="Login">
           <Tab.Screen name="Matches" component={MatchesPage} />
           <Tab.Screen
@@ -80,18 +50,28 @@ const TabNavigation = () => {
             time: null
           }}
         />
+          <Tab.Screen
+          name="User"
+          component={DogProfile}
+          initialParams={{
+            profile: user,
+            self: true,
+            time: null
+          }}
+          />
+          <Tab.Screen
+          name="Friends"
+          component={FriendsPage}
+        />
           </Tab.Navigator>
-      </NavigationContainer>
   )
 }
 const StackNavigation = () => {
 
   return (
-    <NavigationContainer>
         <Stack.Navigator>
-          <Stack.Screen name="Notifications" component={LoginPage} />
+          <Stack.Screen name="Login" component={LoginPage} />
         </Stack.Navigator>
-    </NavigationContainer>
   )
 }
 

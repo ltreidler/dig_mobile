@@ -2,10 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 
 const DogProfile = ({ route }) => {
-  console.log(route.params);
-  const {profile, self, message} = route.params;
 
-  const {image, username, name, breed, age, size} = profile;
+  let {profile, self, message} = route.params;
+
+  
+  const {image, username, name, breed, age, size, energy} = profile;
 
   return (
     <View style={styles.container}>
@@ -16,9 +17,9 @@ const DogProfile = ({ route }) => {
       <Text style={styles.breed}>Breed: {breed}</Text>
       <Text style={styles.age}>Age: {age}</Text>
       <Text style={styles.size}>Size: {size}</Text>
+      <Text style={styles.size}>Energy: {energy}</Text>
     </View>
   );
-
 };
 
 const styles = StyleSheet.create({

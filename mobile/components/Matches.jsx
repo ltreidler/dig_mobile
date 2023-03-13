@@ -20,7 +20,7 @@ const MatchesPage = ({navigation}) => {
   //initially, get the state
   useEffect(() => {
     if(!user.id) return;
-    else dispatch(fetchMatches({id: user.id}));
+    else dispatch(fetchMatches(user.id));
   }, [dispatch, user])
 
   //when new match data is fetched
@@ -73,7 +73,7 @@ const MatchesPage = ({navigation}) => {
     removeMatch(newMatch.id);
     setModalVisible(false);
     setNewMatch({});
-    navigation.navigate('Profile', {
+    navigation.navigate('User', {
       profile: newMatch,
       self: false,
       message: 'You just matched!' 
@@ -95,7 +95,7 @@ const MatchesPage = ({navigation}) => {
           <Text style={styles.name}>{name}</Text>
           <Text>Breed: {breed}</Text>
           <Text>Age: {age}</Text>
-          <Text>Energy: {energy} Match: {matched}</Text>
+          <Text>Energy: {energy} {matched && "."} </Text>
         </View>
         <View style={styles.buttons}>
           <TouchableOpacity onPress={() => onDislike(id)} style={styles.button}>

@@ -9,7 +9,6 @@ const apiHash = {
   1: "affenpinscher",
   4: "airedale",
   6: "akita",
-  21: "cattledog",
   23: "australian",
   28: "basenji",
   31: "beagle",
@@ -21,7 +20,6 @@ const apiHash = {
   50: "collie",
   92: "dalmatian",
   94: "doberman",
-  103: "springer",
   110: "finnish",
   115: "germanshepherd",
   127: "greyhound",
@@ -44,21 +42,22 @@ const apiHash = {
   226: "husky",
   251: "vizsla",
   257: "whippet",
+  21: "cattledog",
+  103: "springer",
 };
 
 async function createDogs(n) {
   try {
 
-      let breedIds = Object.keys(apiHash);
+      let breedIds = Object.keys(apiHash).slice(0, Object.keys(apiHash).length - 4);
 
       //shuffle the breedIds
       for (let i = breedIds.length - 1; i > 0; i--) {
         let j = Math.floor(Math.random() * (i + 1));
         [breedIds[i], breedIds[j]] = [breedIds[j], breedIds[i]]; 
       }
-      
-      breedIds = breedIds.slice(0, 4);
-      console.log(breedIds);
+
+      breedIds = [...breedIds.slice(0,9), 21, 103];
 
     //get those dog breeds
     let breeds = await Promise.all(
@@ -289,60 +288,4 @@ function assignRelationship(distanceScore) {
   }
 
 
-async function writeData() {
-    const {breeds, breedGroups, dogs, relationships, matched} = await createDogs(200);
-
-    // {
-    //     breeds: breeds.map((breed) => {
-    //       return { breed_group: breed.breed_group, breed_name: breed.name };
-    //     }),
-    //     breedGroups,
-    //     dogs: dogsByBreed.flat(),
-    //     relationships,
-    //     matched
-    //   };
-
-    const fileData = `
-    let breeds = ${JSON.stringify(breeds)};
-
-    let breedGroups = ${JSON.stringify(breedGroups)};
-
-    let dogs = ${JSON.stringify(dogs)};
-
-    let relationships = ${JSON.stringify(relationships)};
-
-    let matched = ${JSON.stringify(matched)}`;
-
-
-    fs.writeFile("./dog_data.js", fileData, (err) => {
-        if (err)
-          console.log(err);
-        else {
-            console.log('successfully wrote file');
-        }
-      });
-}
-
 module.exports = createDogs;
-
-/*
-{
-    "weight": {
-        "imperial": "44 - 62",
-        "metric": "20 - 28"
-    },
-    "height": {
-        "imperial": "17 - 20",
-        "metric": "43 - 51"
-    },
-    "id": 21,
-    "name": "Australian Cattle Dog",
-    "country_code": "AU",
-    "bred_for": "Cattle herding, herding trials",
-    "breed_group": "Herding",
-    "life_span": "12 - 14 years",
-    "temperament": "Cautious, Energetic, Loyal, Obedient, Protective, Brave",
-    "reference_image_id": "IBkYVm4v1"
-}
-
-*/

@@ -1,21 +1,20 @@
 const router = require("express").Router();
 const driver = require("../db/db");
 const neo4j = require('neo4j-driver');
+const parseTraits = require('../db/utils');
 
 // /api/matches
-// sends back paginated matches, 10 at a time
-// to do: filters for age, location, breed, etc.
+// sends back matches, 10 at a time, and updates which have been scrolled past
 router.get('/', async (req, res, next) => {
     try {
         const id = neo4j.int(req.query.id);
 
         const session = driver.session();
 
-        //can I add in a way to look at whether the dogs have liked them back?
 
         const query = `
         OPTIONAL MATCH p = (d1:Dog)-[:LIKED|DISLIKED]-(d:Dog)-[:LIKED|DISLIKED]-(d2:Dog)
-        WHERE id(d1) = $id AND d1 <> d2 AND NOT (d1)-[:LIKED|DISLIKED]->(d2) AND NOT (d1)-[:FRIENDS_WITH]-(d2)
+        WHERE id(d1) = $id AND d1 <> d2 AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
         WITH d1, d2, REDUCE(s = 0, r IN collect(relationships(p)) | s + (r[0].weight * r[1].weight)) AS rels_similarity
 
         OPTIONAL MATCH (d1)-[r:SAW]->(d2)
@@ -27,31 +26,28 @@ router.get('/', async (req, res, next) => {
         WHERE jacc >= 0.1 AND similarity >= 0.1
 
         OPTIONAL MATCH (d2)-[r:LIKED]->(d1)
-        WITH d2, COALESCE(r.weight*1.5, 0) AS match_score, jacc, similarity, d1
-        
-        OPTIONAL MATCH (d2)-[:FRIENDS_WITH]-(n)-[:FRIENDS_WITH]-(d1)
-        WITH .....
+        WITH d2, COALESCE(r.weight*1.5, 0) AS match_score, r.weight AS weight, jacc, similarity, d1
 
         MATCH (d2)-[]->(trait)
         WHERE NOT labels(trait)[0] = 'Dog'
         WITH d2, similarity+jacc+match_score as score, collect(trait.name) AS traits, collect(labels(trait)[0]) AS trait_labels, d1, match_score
         ORDER BY score DESC
         LIMIT 10
+    
         MERGE (d1)-[r:SAW]->(d2)
-        SET r.timestamp = datetime()     
+        SET r.timestamp = datetime()
         RETURN d2.name AS name, d2.image AS image, d2.username AS username, id(d2) AS id, score, traits, trait_labels, match_score
         `;
 
-        const data = await session.executeWrite((tx) => 
-            tx.run(query, {id}));
-        
-        const matches = data.records.map(record => {
-            const traits = record.get('traits');
-            const all_traits = {};
-            for(let i = 0; i < traits.length; i++) {
-                all_traits[record.get('trait_labels')[i].toLowerCase()] = traits[i];
-            }
 
+ 
+
+        const {records} = await session.executeWrite((tx) => 
+            tx.run(query, {id}));
+
+        const matches = records.map(record => {
+            const all_traits = parseTraits(record);
+      
             const matched = typeof record.get('match_score') === 'number';
 
             return {
@@ -60,10 +56,10 @@ router.get('/', async (req, res, next) => {
                 image: record.get('image'),
                 username: record.get('username'),
                 matched,
-                score: record.get('match_score'),
+                score: record.get('score').toFixed(2),
                 ...all_traits
             }
-
+      
         })
 
         await session.close();
@@ -79,7 +75,10 @@ router.get('/', async (req, res, next) => {
 // sends back the user's friends
 router.get('/friends', async (req, res, next) => {
     try {
-        const {id} = req.query;
+        let {id, page} = req.query;
+        
+        if(isNaN(Number(page)) || page < 1) page = 1;
+        let offset = (Number(page) - 1) * 10;
 
         const session = driver.session();
 
@@ -89,17 +88,16 @@ router.get('/friends', async (req, res, next) => {
         MATCH (d2)-[]->(trait)
         WHERE NOT labels(trait)[0] = 'Dog'
         RETURN collect(trait.name) AS traits, collect(labels(trait)[0]) AS trait_labels, d2.name AS name, d2.image AS image, d2.username AS username, id(d2) AS id
+        SKIP $offset
+        LIMIT 10
         `;
 
-        const data = await session.executeWrite((tx) => 
-            tx.run(query, {id: neo4j.int(id)}));
+        const {records} = await session.executeWrite((tx) => 
+            tx.run(query, {id: neo4j.int(id), offset: neo4j.int(offset)}));
         
-        const friends = data.records.map(record => {
-            const traits = record.get('traits');
-            const all_traits = {};
-            for(let i = 0; i < traits.length; i++) {
-                all_traits[record.get('trait_labels')[i].toLowerCase()] = traits[i];
-            }
+        const friends = records.map(record => {
+
+            const all_traits = parseTraits(record)
 
             return {
                 id: record.get('id').toNumber(),
@@ -128,7 +126,6 @@ router.post('/like', async (req, res, next) => {
         const {id, matchId} = req.body;
 
         const session = driver.session();
-        console.log(id, matchId, 'LIKE!');
 
         const query = `
         MATCH (d:Dog), (m:Dog)
@@ -193,8 +190,6 @@ router.post('/friend', async (req, res, next) => {
 
         await session.executeWrite((tx) => 
             tx.run(query, {id: neo4j.int(id), matchId: neo4j.int(matchId)}));
-
-        
 
         await session.close();
 

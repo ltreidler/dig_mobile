@@ -1,54 +1,13 @@
-//convert neo4j properties to native js types
-function toNative(properties) {
-  return Object.fromEntries(
-    Object.keys(properties).map(key => {
-      let value = valueToNative(properties[key]);
+//for converting neo4j dog objects
+function parseTraits(record) {
 
-      return [key, value];
-    })
-  );
-}
-
-function valueToNative(value) {
-  if (Array.isArray(value)) {
-    value = value.map(val => valueToNative(value));
-  } else if ((value)) {
-    value = value.toNumber();
-  } else if (
-    isDate(value) ||
-    isDateTime(value) ||
-    isTime(value) ||
-    isLocalDateTime(value) ||
-    isLocalTime(value) ||
-    isDuration(value)
-  ) {
-    value = value.toString();
-  } else if (
-    typeof value === "object" &&
-    value !== undefined &&
-    value !== null
-  ) {
-    value = toNativeTypes(value);
-  }
-
-  return value;
-}
-
-function parseNeo(records) {
-  console.log(Array.isArray(records));
-  if(Array.isArray(records)) {
-    records = records.map(({keys, _fields, _fieldLookup}) => {
-      let parsed = {};
-      
-      for(let key of keys) {
-        console.log(_fields.get(key));
-        parsed[key] = _fields.get(key);
+      const traits = record.get('traits');
+      const all_traits = {};
+      for(let i = 0; i < traits.length; i++) {
+          all_traits[record.get('trait_labels')[i].toLowerCase()] = traits[i];
       }
-      return parsed;
-    })
-    return records;
+      return all_traits;
 
-  }
 }
 
-module.exports = parseNeo;
+module.exports = parseTraits;
