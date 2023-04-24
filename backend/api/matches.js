@@ -1,18 +1,23 @@
 const router = require("express").Router();
 const driver = require("../db/db");
-const neo4j = require('neo4j-driver');
-const parseTraits = require('../db/utils');
+const neo4j = require("neo4j-driver");
+const parseTraits = require("../db/utils");
 
 // /api/matches
 // sends back matches, 10 at a time, and updates which have been scrolled past
-router.get('/', async (req, res, next) => {
-    try {
-        const id = neo4j.int(req.query.id);
+router.get("/", async (req, res, next) => {
+  try {
+    const id = neo4j.int(req.query.id);
 
-        const session = driver.session();
+    const session = driver.session();
 
-
-        const query = `
+    //find dogs with mutual likes or dislikes and create a score based on the number and type of relationships
+    //filter out dogs that the user has already seen recently
+    //calculate a jaccard index based on the dog's mutual traits
+    //check if the dog has liked the user
+    //rank the matches
+    //return a ranked list of 10 matches and mark them as seen
+    const query = `
         OPTIONAL MATCH p = (d1:Dog)-[:LIKED|DISLIKED]-(d:Dog)-[:LIKED|DISLIKED]-(d2:Dog)
         WHERE id(d1) = $id AND d1 <> d2 AND NOT (d1)-[:LIKED|DISLIKED]->(d2)
         WITH d1, d2, REDUCE(s = 0, r IN collect(relationships(p)) | s + (r[0].weight * r[1].weight)) AS rels_similarity
@@ -39,50 +44,46 @@ router.get('/', async (req, res, next) => {
         RETURN d2.name AS name, d2.image AS image, d2.username AS username, id(d2) AS id, score, traits, trait_labels, match_score
         `;
 
+    const { records } = await session.executeWrite((tx) =>
+      tx.run(query, { id })
+    );
 
- 
+    const matches = records.map((record) => {
+      const all_traits = parseTraits(record);
 
-        const {records} = await session.executeWrite((tx) => 
-            tx.run(query, {id}));
+      const matched = typeof record.get("match_score") === "number";
 
-        const matches = records.map(record => {
-            const all_traits = parseTraits(record);
-      
-            const matched = typeof record.get('match_score') === 'number';
+      return {
+        id: record.get("id").toNumber(),
+        name: record.get("name"),
+        image: record.get("image"),
+        username: record.get("username"),
+        matched,
+        score: record.get("score").toFixed(2),
+        ...all_traits,
+      };
+    });
 
-            return {
-                id: record.get('id').toNumber(),
-                name: record.get('name'),
-                image: record.get('image'),
-                username: record.get('username'),
-                matched,
-                score: record.get('score').toFixed(2),
-                ...all_traits
-            }
-      
-        })
+    await session.close();
 
-        await session.close();
-
-        res.json(matches);
-    
-    }   catch (err) {
-        next(err);
-    } 
-})
+    res.json(matches);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // /api/friends
 // sends back the user's friends
-router.get('/friends', async (req, res, next) => {
-    try {
-        let {id, page} = req.query;
-        
-        if(isNaN(Number(page)) || page < 1) page = 1;
-        let offset = (Number(page) - 1) * 10;
+router.get("/friends", async (req, res, next) => {
+  try {
+    let { id, page } = req.query;
 
-        const session = driver.session();
+    if (isNaN(Number(page)) || page < 1) page = 1;
+    let offset = (Number(page) - 1) * 10;
 
-        const query = `
+    const session = driver.session();
+
+    const query = `
         MATCH (d:Dog)-[:FRIENDS_WITH]-(d2:Dog)
         WHERE id(d) = $id AND d2 <> d
         MATCH (d2)-[]->(trait)
@@ -92,95 +93,92 @@ router.get('/friends', async (req, res, next) => {
         LIMIT 10
         `;
 
-        const {records} = await session.executeWrite((tx) => 
-            tx.run(query, {id: neo4j.int(id), offset: neo4j.int(offset)}));
-        
-        const friends = records.map(record => {
+    const { records } = await session.executeWrite((tx) =>
+      tx.run(query, { id: neo4j.int(id), offset: neo4j.int(offset) })
+    );
 
-            const all_traits = parseTraits(record)
+    const friends = records.map((record) => {
+      const all_traits = parseTraits(record);
 
-            return {
-                id: record.get('id').toNumber(),
-                name: record.get('name'),
-                image: record.get('image'),
-                username: record.get('username'),
-                ...all_traits
-            }
+      return {
+        id: record.get("id").toNumber(),
+        name: record.get("name"),
+        image: record.get("image"),
+        username: record.get("username"),
+        ...all_traits,
+      };
+    });
 
-        })
+    await session.close();
 
-
-        await session.close();
-
-        res.json(friends);
-
-    } catch(err) {
-        next(err);
-    }
-})
+    res.json(friends);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // /api/matches/like
 // creates like relationship, sends back whether the other user has also liked
-router.post('/like', async (req, res, next) => {
-    try {
-        const {id, matchId} = req.body;
+router.post("/like", async (req, res, next) => {
+  try {
+    const { id, matchId } = req.body;
 
-        const session = driver.session();
+    const session = driver.session();
 
-        const query = `
+    const query = `
         MATCH (d:Dog), (m:Dog)
         WHERE id(d) = $id AND id(m) = $matchId
         MERGE (d)-[l:LIKED]->(m)
         SET l.weight = 0.5
         `;
 
-        await session.executeWrite((tx) => 
-            tx.run(query, {id: neo4j.int(id), matchId: neo4j.int(matchId)}));
+    await session.executeWrite((tx) =>
+      tx.run(query, { id: neo4j.int(id), matchId: neo4j.int(matchId) })
+    );
 
-        await session.close();
+    await session.close();
 
-        res.json();
-
-    } catch (err) {
-        next(err);
-    }
-})
+    res.json();
+  } catch (err) {
+    next(err);
+  }
+});
 
 // /api/matches/dislike/:dogId
 // creates dislike relationship
-router.post('/dislike', async (req, res, next) => {
-    try {
-        const {id, matchId} = req.body;
+router.post("/dislike", async (req, res, next) => {
+  try {
+    const { id, matchId } = req.body;
 
-        const session = driver.session();
+    const session = driver.session();
 
-        const query = `
+    const query = `
         MATCH (d:Dog), (m:Dog)
         WHERE id(d) = $id AND id(m) = $matchId
         MERGE (d)-[r1:DISLIKED]->(m)
         SET r1.weight = -0.5`;
 
-        await session.executeWrite((tx) => 
-            tx.run(query, {id: neo4j.int(id), matchId: neo4j.int(matchId)}));
+    await session.executeWrite((tx) =>
+      tx.run(query, { id: neo4j.int(id), matchId: neo4j.int(matchId) })
+    );
 
-        await session.close();
+    await session.close();
 
-        res.send();
+    res.send();
+  } catch (err) {
+    next(err);
+  }
+});
 
-    } catch (err) {
-        next(err);
-    }
-})
+// /api/matches/friend
+// sets the users to friends
+router.post("/friend", async (req, res, next) => {
+  try {
+    const { id, matchId } = req.body;
 
-// /api/matches/dislike/:dogId
-// creates dislike relationship
-router.post('/friend', async (req, res, next) => {
-    try {
-        const {id, matchId} = req.body;
+    const session = driver.session();
 
-        const session = driver.session();
-
-        const query = `
+    const query = `
         MATCH (f:Dog)-[r2:LIKED]->(d:Dog)
         WHERE id(d) = $id AND id(f) = $matchId
         WITH d, f, r2
@@ -188,17 +186,16 @@ router.post('/friend', async (req, res, next) => {
         WITH d, f
         MERGE (d)-[r:FRIENDS_WITH]-(f)`;
 
-        await session.executeWrite((tx) => 
-            tx.run(query, {id: neo4j.int(id), matchId: neo4j.int(matchId)}));
+    await session.executeWrite((tx) =>
+      tx.run(query, { id: neo4j.int(id), matchId: neo4j.int(matchId) })
+    );
 
-        await session.close();
+    await session.close();
 
-        res.status(201).send();
-
-    } catch (err) {
-        next(err);
-    }
-})
+    res.status(201).send();
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
-

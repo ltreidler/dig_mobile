@@ -2,6 +2,7 @@ const driver = require("../db/db");
 const session = driver.session();
 const createDogs = require("./data/dog_breeds");
 
+//clear the database
 async function clearDb() {
   try {
     await session.executeWrite((tx) => tx.run("MATCH (n) DETACH DELETE n"));
@@ -11,6 +12,7 @@ async function clearDb() {
   }
 }
 
+//seed the database
 async function seed() {
   try {
     console.log("Clearing db...");
@@ -19,7 +21,7 @@ async function seed() {
     const { breeds, breedGroups, dogs, relationships } = await createDogs(500);
 
     console.log(`Seeding ${breeds.length} breed and ${dogs.length} dogs!`);
- 
+
     //create dog breed groups
     await session.executeWrite((tx) =>
       Promise.all(
@@ -90,7 +92,6 @@ async function seed() {
       )
     );
 
-
     const weights = {
       LIKED: 0.5,
       DISLIKED: -0.5,
@@ -152,8 +153,6 @@ async function seed() {
             MATCH (n2)-[r:LIKED]->(n) WHERE NOT (n)-[:LIKED|DISLIKED]->(n2) WITH count(DISTINCT n2) AS ct, n ORDER BY ct DESC LIMIT 10 RETURN n, ct
 
     */
-
-            
 
     console.log("Success!");
   } catch (err) {

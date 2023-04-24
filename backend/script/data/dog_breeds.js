@@ -1,6 +1,6 @@
 const axios = require("axios");
 const { faker } = require("@faker-js/faker");
-const fs = require('fs');
+const fs = require("fs");
 
 const headers = { "x-api-key": process.env.DOG_API_KEY };
 //21 = australian cattle dog, ESP = 103, 264 max
@@ -46,18 +46,21 @@ const apiHash = {
   103: "springer",
 };
 
+//seed n dogs to the neo4j database
 async function createDogs(n) {
   try {
+    let breedIds = Object.keys(apiHash).slice(
+      0,
+      Object.keys(apiHash).length - 4
+    );
 
-      let breedIds = Object.keys(apiHash).slice(0, Object.keys(apiHash).length - 4);
+    //shuffle the breedIds
+    for (let i = breedIds.length - 1; i > 0; i--) {
+      let j = Math.floor(Math.random() * (i + 1));
+      [breedIds[i], breedIds[j]] = [breedIds[j], breedIds[i]];
+    }
 
-      //shuffle the breedIds
-      for (let i = breedIds.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [breedIds[i], breedIds[j]] = [breedIds[j], breedIds[i]]; 
-      }
-
-      breedIds = [...breedIds.slice(0,9), 21, 103];
+    breedIds = [...breedIds.slice(0, 9), 21, 103];
 
     //get those dog breeds
     let breeds = await Promise.all(
@@ -79,42 +82,43 @@ async function createDogs(n) {
     const breedGroups = Object.keys(groups);
 
     //create a random number of each breed, saving them in arrays
-    const dogsNums = Array(breedIds.length)
-      .fill(Math.floor(n/breedIds.length));
+    const dogsNums = Array(breedIds.length).fill(
+      Math.floor(n / breedIds.length)
+    );
 
-      let emailHash = {};
-      let usernameHash = {};
+    let emailHash = {};
+    let usernameHash = {};
     const dogsByBreed = await Promise.all(
       dogsNums.map((num, i) => {
         return createDogBreedArr(breeds[i], num, emailHash, usernameHash);
       })
     );
 
-    const dogs = dogsByBreed.flat().map(({weight, energy, age, ...rest}) => {
+    const dogs = dogsByBreed.flat().map(({ weight, energy, age, ...rest }) => {
       let size;
-      if(weight < 30) size = 'Small';
-      else if(weight < 50) size = 'Medium';
-      else if(weight < 80) size = 'Large';
-      else size = 'XLarge';
+      if (weight < 30) size = "Small";
+      else if (weight < 50) size = "Medium";
+      else if (weight < 80) size = "Large";
+      else size = "XLarge";
 
-      if(energy <= 3) energy = 'Low';
-      else if(energy <= 6) energy = 'Medium';
-      else energy = 'High';
+      if (energy <= 3) energy = "Low";
+      else if (energy <= 6) energy = "Medium";
+      else energy = "High";
 
-      if(age < 2) age = 'Puppy';
-      else if(age < 4) age = 'Young';
-      else if(age < 9) age = 'Adult';
-      else age = 'Senior';
+      if (age < 2) age = "Puppy";
+      else if (age < 4) age = "Young";
+      else if (age < 9) age = "Adult";
+      else age = "Senior";
 
       return {
         size,
         energy,
         age,
-        ...rest 
-      }
-    })
+        ...rest,
+      };
+    });
 
-    const {relationships} = assignRelationships(dogsByBreed.flat());
+    const { relationships } = assignRelationships(dogsByBreed.flat());
 
     return {
       breeds: breeds.map((breed) => {
@@ -122,7 +126,7 @@ async function createDogs(n) {
       }),
       breedGroups,
       dogs,
-      relationships
+      relationships,
     };
   } catch (err) {
     console.error(err);
@@ -130,8 +134,10 @@ async function createDogs(n) {
 }
 
 async function createDogBreedArr(breed, num, emailHash, usernameHash) {
-  let [max, min] = breed.weight.imperial.split('-').map(num => Number(num.trim()));
-  if(isNaN(max) || isNaN(min)) {
+  let [max, min] = breed.weight.imperial
+    .split("-")
+    .map((num) => Number(num.trim()));
+  if (isNaN(max) || isNaN(min)) {
     max = 50;
     min = 10;
   }
@@ -146,7 +152,9 @@ async function createDogBreedArr(breed, num, emailHash, usernameHash) {
   if (images.length < num) {
     //get remaining images from random
 
-    const {data} = await axios.get(`https://dog.ceo/api/breed/hound/images/random/${num - images.length}`);
+    const { data } = await axios.get(
+      `https://dog.ceo/api/breed/hound/images/random/${num - images.length}`
+    );
     images = images.concat(data.message);
   }
 
@@ -157,16 +165,23 @@ async function createDogBreedArr(breed, num, emailHash, usernameHash) {
       (age < maxLifeSpan / 3 ? 6 : age < maxLifeSpan / 6 ? 3 : 0) +
       Math.ceil(Math.random() * 3);
     let name = faker.name.firstName();
-    let username = faker.internet.userName().toLowerCase() + Math.floor(Math.random()*400);;
-    let email = faker.internet.email().toLowerCase() + Math.floor(Math.random()*400);;
+    let username =
+      faker.internet.userName().toLowerCase() + Math.floor(Math.random() * 400);
+    let email =
+      faker.internet.email().toLowerCase() + Math.floor(Math.random() * 400);
 
     let image = images[i];
-    let weight = Math.max(Math.floor(Math.random() * (max - min + 1)) + min - (maxLifeSpan-(age*1.5)), 3);
-    const password = name.toLowerCase() + '_pass';
+    let weight = Math.max(
+      Math.floor(Math.random() * (max - min + 1)) +
+        min -
+        (maxLifeSpan - age * 1.5),
+      3
+    );
+    const password = name.toLowerCase() + "_pass";
     const sex = ["M", "F"][Math.floor(Math.random() * 2)];
 
     dogs.push({
-    name,
+      name,
       age,
       energy,
       sex,
@@ -183,109 +198,105 @@ async function createDogBreedArr(breed, num, emailHash, usernameHash) {
 }
 
 function assignRelationships(dogs, breeds) {
-    //none, disliked, scrolledPast, liked, matched
-    const relationships = [];
-    const matched = [];
+  //none, disliked, scrolledPast, liked, matched
+  const relationships = [];
+  const matched = [];
 
-    for(let i = 0; i < dogs.length; i += 6) {
-        const dog1 = dogs[i];
+  for (let i = 0; i < dogs.length; i += 6) {
+    const dog1 = dogs[i];
 
-        for(let j = i + 1; j < dogs.length; j += 6) {
-            const dog2 = dogs[j];
+    for (let j = i + 1; j < dogs.length; j += 6) {
+      const dog2 = dogs[j];
 
-            const [rel1, rel2] = chooseRelationships(dog1, dog2, breeds);
+      const [rel1, rel2] = chooseRelationships(dog1, dog2, breeds);
 
-            //0 = none, disliked = 1, scrolledPast = 2, liked=3
-                if(rel1 !== 'none') relationships.push({
-                    dog2,
-                    dog1,
-                    rel: rel1
-                });
-                if(rel2 !== 'none') relationships.push({
-                    dog2,
-                    dog1,
-                    rel: rel2
-                });
-            }
-        }
+      //0 = none, disliked = 1, scrolledPast = 2, liked=3
+      if (rel1 !== "none")
+        relationships.push({
+          dog2,
+          dog1,
+          rel: rel1,
+        });
+      if (rel2 !== "none")
+        relationships.push({
+          dog2,
+          dog1,
+          rel: rel2,
+        });
+    }
+  }
 
-        
-    
-
-    return {relationships, matched};
+  return { relationships, matched };
 }
 
 function chooseRelationships(dog1, dog2, breeds) {
-    const weights = {
-          age: 0.3,
-          energy: 0.5,
-          sex: 0.1,
-          weight: 0.2,
-          breed: 0.4
-        }
+  const weights = {
+    age: 0.3,
+    energy: 0.5,
+    sex: 0.1,
+    weight: 0.2,
+    breed: 0.4,
+  };
 
-    let sum = 0;
+  let sum = 0;
 
-    //normalize age, weight and energy
-    const dog1Normalized = normalize(dog1);
-    const dog2Normalized = normalize(dog2);
+  //normalize age, weight and energy
+  const dog1Normalized = normalize(dog1);
+  const dog2Normalized = normalize(dog2);
 
-    for(let trait in weights) {
-        let diff = 0;
-        if(trait === 'sex') diff = dog1[trait] === dog2[trait] ? 0.8 : 0;
-        else if(trait === 'breed') diff = dog1[trait] === dog2[trait] ? 1 : 0;
-        else diff = dog1Normalized[trait] - dog2Normalized[trait];
+  for (let trait in weights) {
+    let diff = 0;
+    if (trait === "sex") diff = dog1[trait] === dog2[trait] ? 0.8 : 0;
+    else if (trait === "breed") diff = dog1[trait] === dog2[trait] ? 1 : 0;
+    else diff = dog1Normalized[trait] - dog2Normalized[trait];
 
-        sum += weights[trait] * Math.pow(diff, 2);
-    }
+    sum += weights[trait] * Math.pow(diff, 2);
+  }
 
+  const distance = (Math.sqrt(sum) - 0.5) / 0.5;
 
-    const distance = (Math.sqrt(sum) - 0.5)/(0.5);
-
-    return [assignRelationship(distance), assignRelationship(distance)];
+  return [assignRelationship(distance), assignRelationship(distance)];
 }
 
 function normalize(dog) {
-        // Define min and max values for each trait
-        const minValues = { age: 0, energy: 0, weight: 5 };
-        const maxValues = { age: 16, energy: 10, weight: 100 };
-      
-        // Normalize each trait value based on min and max values
-        const normalizedTraits = {};
+  // Define min and max values for each trait
+  const minValues = { age: 0, energy: 0, weight: 5 };
+  const maxValues = { age: 16, energy: 10, weight: 100 };
 
-        for (let trait in minValues) {
-          if (trait !== 'id') {
-            const traitValue = dog[trait];
-            const minValue = minValues[trait];
-            const maxValue = maxValues[trait];
-            const normalizedValue = (traitValue - minValue) / (maxValue - minValue);
-            normalizedTraits[trait] = normalizedValue;
-          }
-        }
-      
-        return normalizedTraits;
+  // Normalize each trait value based on min and max values
+  const normalizedTraits = {};
+
+  for (let trait in minValues) {
+    if (trait !== "id") {
+      const traitValue = dog[trait];
+      const minValue = minValues[trait];
+      const maxValue = maxValues[trait];
+      const normalizedValue = (traitValue - minValue) / (maxValue - minValue);
+      normalizedTraits[trait] = normalizedValue;
+    }
+  }
+
+  return normalizedTraits;
 }
 
 function assignRelationship(distanceScore) {
+  const relProbs = {
+    LIKED: 0.4,
+    DISLIKED: 0.5,
+  };
 
-    const relProbs = {
-      LIKED: 0.4,
-      DISLIKED: 0.5
-    };
-
-    let cumulativeProb = 0;
-    for (let rel in relProbs) {
-      cumulativeProb += relProbs[rel];
-      const randomFactor = Math.random() * 0.2 - 0.1;
-      if(Math.random() < 0.2) return 'LIKED';
-      if (distanceScore <= cumulativeProb + randomFactor) {
-        return rel;
-      }
+  let cumulativeProb = 0;
+  for (let rel in relProbs) {
+    cumulativeProb += relProbs[rel];
+    const randomFactor = Math.random() * 0.2 - 0.1;
+    if (Math.random() < 0.2) return "LIKED";
+    if (distanceScore <= cumulativeProb + randomFactor) {
+      return rel;
     }
-
-    //default to none
-    return 'none';
   }
 
+  //default to none
+  return "none";
+}
 
 module.exports = createDogs;

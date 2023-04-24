@@ -1,12 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import React from "react";
+import { View, Text, StyleSheet, Image } from "react-native";
 
+//Single dog's profile (includes user and friends)
+//takes in and displays user's data
 const DogProfile = ({ route }) => {
+  let { profile, self, message } = route.params;
 
-  let {profile, self, message} = route.params;
-
-  
-  const {image, username, name, breed, age, size, energy} = profile;
+  const { image, username, name, breed, age, size, energy } = profile;
 
   return (
     <View style={styles.container}>
@@ -24,7 +24,7 @@ const DogProfile = ({ route }) => {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   image: {
@@ -32,16 +32,16 @@ const styles = StyleSheet.create({
     height: 275,
     borderRadius: 100,
     marginBottom: 10,
-    marginTop: 20
+    marginTop: 20,
   },
   username: {
     fontSize: 40,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 5,
   },
   name: {
     fontSize: 25,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 5,
   },
   breed: {
